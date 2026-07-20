@@ -9,18 +9,18 @@ bottle_id       = 21.5; // 可樂瓶口內徑 (mm)
 tolerance       = 0.30; // 3D列印公差
 
 // 下方接頭參數（維持加厚以利挖坑）
-neck_wall_thickness = 3;  // 下方螺紋外壁厚度 (mm)
+neck_wall_thickness = 3;    // 下方螺紋外壁厚度 (mm)
 neck_height         = 16.0; // 螺紋段總高度 (mm)
 
-// 上方漏斗參數（獨立輕量化）
-funnel_wall_thickness = 0.4;  // 上方漏斗壁厚 1mm
+// 上方漏斗參數（修正壁厚以防切片空層）
+funnel_wall_thickness = 1.2;  // 修正：增加至 1.2mm (適合 0.4mm 噴嘴印 3 層牆)
 funnel_top_id         = 75.0; // 漏斗上方開口內徑 (mm)
 funnel_height         = 55.0; // 漏斗錐形區域高度 (mm)
 
 // PCO 標準螺紋參數 (內凹坑洞型式)
 thread_pitch    = 2.70; // 可樂瓶標準螺距 (mm)
 thread_turns    = 2.2;  // 螺紋圈數
-thread_depth    = 2;  // 螺紋內凹坑的深度 (mm)
+thread_depth    = 2;    // 螺紋內凹坑的深度 (mm)
 
 // 引流管參數
 guide_wall           = 1.5;  // 引流管壁厚 (mm)
@@ -34,23 +34,22 @@ cone_bottom_in_r = (bottle_id / 2) - 0.4 - guide_wall; // 漏斗最底部的內�
 // 主模型組裝
 // ==========================================
 union() {
-    // 1. 上方漏斗本體
-    translate([0, 0, neck_height])
+    // 1. 上方漏斗本體 (高度緊接在斜坡上方)
+    translate([0, 0, neck_height + neck_wall_thickness])
         funnel_cone();
 
-    // 2. ✨ 新增：45度防懸空過渡斜坡 ✨
-    // 當大口朝下打印時，這個斜坡能讓外壁平滑過渡，防止懸空垮掉
+    // 2. ✨ 45度防懸空過渡斜坡 ✨
     translate([0, 0, neck_height]) {
         difference() {
             // 斜坡外錐
-            cylinder(h = neck_wall_thickness, 
-                     r1 = outer_r, 
+            cylinder(h = neck_wall_thickness,
+                     r1 = outer_r,
                      r2 = cone_bottom_in_r + funnel_wall_thickness);
-            // 斜坡內孔 (維持平滑流道)
+            // 斜坡內孔
             translate([0, 0, -0.1])
-                cylinder(h = neck_wall_thickness + 0.2, 
-                         r1 = cone_bottom_in_r, 
-                         r2 = cone_bottom_in_r); // 垂直內壁
+                cylinder(h = neck_wall_thickness + 0.2,
+                         r1 = cone_bottom_in_r,
+                         r2 = cone_bottom_in_r);
         }
     }
 
@@ -58,18 +57,18 @@ union() {
     difference() {
         // 基礎：完全實心的加厚圓柱外殼
         cylinder(h = neck_height, r = outer_r);
-        
+
         // 減去：內外壁之間的「環形槽」
         translate([0, 0, -1])
             difference() {
                 cylinder(h = neck_height + 2, r = inner_r);
                 cylinder(h = neck_height + 2, r = (bottle_id / 2) - 0.4);
             }
-            
+
         // 減去：最內側的液體通道
         translate([0, 0, -1])
-            cylinder(h = neck_height + 2, r = (bottle_id / 2) - 0.4 - guide_wall);
-            
+            cylinder(h = neck_height + 2, r = cone_bottom_in_r);
+
         // 減去：直接在內壁挖出螺紋坑
         sunk_threads();
     }
@@ -81,20 +80,17 @@ union() {
 
 // 漏斗錐形本體模組
 module funnel_cone() {
-    // 將漏斗本體往上移動斜坡的高度，避免重疊
-    translate([0, 0, neck_wall_thickness]) {
-        difference() {
-            // 外錐體
-            cylinder(h = funnel_height, 
-                     r1 = cone_bottom_in_r + funnel_wall_thickness, 
-                     r2 = (funnel_top_id / 2) + funnel_wall_thickness);
-            
-            // 內錐體 (挖空)
-            translate([0, 0, -0.1])
-                cylinder(h = funnel_height + 0.2, 
-                         r1 = cone_bottom_in_r, 
-                         r2 = funnel_top_id / 2);
-        }
+    difference() {
+        // 外錐體
+        cylinder(h = funnel_height,
+                 r1 = cone_bottom_in_r + funnel_wall_thickness,
+                 r2 = (funnel_top_id / 2) + funnel_wall_thickness);
+
+        // 內錐體 (挖空)
+        translate([0, 0, -0.1])
+            cylinder(h = funnel_height + 0.2,
+                     r1 = cone_bottom_in_r,
+                     r2 = funnel_top_id / 2);
     }
 }
 
@@ -102,13 +98,13 @@ module funnel_cone() {
 module sunk_threads() {
     total_twist = thread_turns * 360;
     thread_h = thread_turns * thread_pitch;
-    
-    translate([0, 0, 1.0]) { 
+
+    translate([0, 0, 1.0]) {
         linear_extrude(height = thread_h, twist = -total_twist, slices = 120, convexity = 10) {
             translate([inner_r, 0, 0])
                 polygon(points=[
-                    [-0.1, 0], 
-                    [thread_depth, 0.45 * thread_pitch], 
+                    [-0.1, 0],
+                    [thread_depth, 0.45 * thread_pitch],
                     [-0.1, 0.9 * thread_pitch]
                 ]);
         }

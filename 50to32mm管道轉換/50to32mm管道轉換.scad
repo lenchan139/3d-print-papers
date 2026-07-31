@@ -1,13 +1,16 @@
 // ===================================================
-// 內壁雙階梯外套式 (入口 52mm -> 內部 51mm) 至 32mm 管道轉接頭
+// 內壁三段式階梯外套 (入口 51mm -> 50mm -> 49mm) 至 32mm 管道轉接頭
 // ===================================================
 
-/* [風機端內壁階梯尺寸 (單位: mm)] */
-id_entry    = 52.0;    // 入口段內徑 (較寬鬆，方便對準與套入)
-h_entry     = 15.0;    // 入口段深度
+/* [風機端內壁三段階梯尺寸 (單位: mm)] */
+id_step1    = 51.0;    // 入口第一階內徑 (最寬鬆，方便對準)
+h_step1     = 10.0;    // 第一階深度
 
-id_inner    = 51.0;    // 內部段內徑 (較緊密，越往內卡越緊)
-h_inner     = 15.0;    // 內部段深度
+id_step2    = 50.0;    // 中間第二階內徑 (標準配合)
+h_step2     = 10.0;    // 第二階深度
+
+id_step3    = 49.0;    // 最深第三階內徑 (緊密卡緊)
+h_step3     = 10.0;    // 第三階深度
 
 /* [32mm 管道端尺寸] */
 pipe32_od   = 32.0;    // 32mm 端管道外徑
@@ -25,48 +28,55 @@ $fn = 120;             // 圓弧平滑度
 // 3D 模型構建邏輯
 // ===================================================
 
-module internal_stepped_adapter() {
-    // 以較大的 52mm 內徑計算統一的外徑，確保外壁平整美觀
-    outer_d_fan = id_entry + (wall * 2);               // 56.0mm
+module triple_internal_stepped_adapter() {
+    // 總套入深度
+    h_fan_total = h_step1 + h_step2 + h_step3; // 30mm
     
-    d2_out      = pipe32_od;                           // 32.0mm
-    d2_in       = d2_out - (wall * 2);                 // 28.0mm
+    // 以最大的 51mm 內徑計算統一外徑，保持外壁平整美觀
+    outer_d_fan = id_step1 + (wall * 2);       // 55.0mm
+    
+    d2_out      = pipe32_od;                   // 32.0mm
+    d2_in       = d2_out - (wall * 2);         // 28.0mm
 
     difference() {
         // --- 1. 外輪廓實心體 (外壁為順滑圓柱與錐體) ---
         union() {
-            // 風機外套段外壁 (長度為入口段 + 內部段)
-            cylinder(d = outer_d_fan, h = h_entry + h_inner);
+            // 風機外套段外壁
+            cylinder(d = outer_d_fan, h = h_fan_total);
             
             // 錐形漸變過渡段
-            translate([0, 0, h_entry + h_inner])
+            translate([0, 0, h_fan_total])
                 cylinder(d1 = outer_d_fan, d2 = d2_out, h = h_trans);
             
             // 32mm 管道連接段
-            translate([0, 0, h_entry + h_inner + h_trans])
+            translate([0, 0, h_fan_total + h_trans])
                 cylinder(d = d2_out, h = h_pipe32);
         }
         
-        // --- 2. 內部空腔挖空 (關鍵：內壁做階梯) ---
+        // --- 2. 內部空腔挖空 (內壁做三段階梯) ---
         translate([0, 0, -1])
             union() {
-                // [階梯 1] 52mm 入口內腔 (底部最先套入處)
-                cylinder(d = id_entry, h = h_entry + 1);
+                // [階梯 1] 51mm 入口內腔
+                cylinder(d = id_step1, h = h_step1 + 1);
                 
-                // [階梯 2] 51mm 內部內腔 (再往深處推進卡緊處)
-                translate([0, 0, h_entry])
-                    cylinder(d = id_inner, h = h_inner + 0.1);
+                // [階梯 2] 50mm 中間內腔
+                translate([0, 0, h_step1])
+                    cylinder(d = id_step2, h = h_step2 + 0.1);
+                
+                // [階梯 3] 49mm 深處內腔
+                translate([0, 0, h_step1 + h_step2])
+                    cylinder(d = id_step3, h = h_step3 + 0.1);
                 
                 // 漸變段內腔
-                translate([0, 0, h_entry + h_inner])
-                    cylinder(d1 = id_inner, d2 = d2_in, h = h_trans + 0.1);
+                translate([0, 0, h_fan_total])
+                    cylinder(d1 = id_step3, d2 = d2_in, h = h_trans + 0.1);
                 
                 // 32mm 端貫穿內腔
-                translate([0, 0, h_entry + h_inner + h_trans])
+                translate([0, 0, h_fan_total + h_trans])
                     cylinder(d = d2_in, h = h_pipe32 + 3);
             }
     }
 }
 
 // 執行模型生成
-internal_stepped_adapter();
+triple_internal_stepped_adapter();
